@@ -16,6 +16,13 @@
 #define VQEX1
 #include "leddispd.h"
 
+// alternate between two screens
+// showing either a temperature and a clock or
+// two temperatures
+
+// If defined, implement version with two thermometers and no clock  
+#define TWO_THERMOMETERS 1
+
 // Pins for encoder
 #define PINCLK 6
 #define PINDT 5
@@ -36,6 +43,13 @@ const int pinDS = 7;
 OneWire oneWireDS(pinDS);
 // Dallas Temperature sensor instance
 DallasTemperature sensDS(&oneWireDS);  
+
+#ifdef TWO_THERMOMETERS
+// Define pin number for connected DS18B20
+const int pinDS2 = 5;
+OneWire oneWireDS2(pinDS2);
+DallasTemperature sensDS2(&oneWireDS2);  
+#endif
 
 // Digit segments to display
 unsigned char disparr[4];
@@ -111,7 +125,20 @@ void leddisp()
 
   // display time for 5 sec, then temp for 5 sec
   if ((msTimer / 250) % 10 == 0 && tempWasLast) {
+#ifdef TWO_THERMOMETERS
+    unsigned int value, sigpoint;
+    float tempval;
+    sensDS2.requestTemperatures();
+    tempval=sensDS2.getTempCByIndex(0);
+    value = (int)(tempval * 10);
+    IntToDisp(value);
+    SetDP(2);
+    ++sigpoint &= 0x0001;
+    if(sigpoint) disparr[3] = chartab[0x0A];
+#else
     IntToDisp(100*hourTimer + minTimer);
+#endif
+
     tempWasLast = 0;
   } else if ((msTimer / 250) % 10 == 5 && !tempWasLast) {
     unsigned int value, sigpoint;
@@ -217,11 +244,15 @@ void setup() {
   MsTimer2::set(4, leddisp); // 4 ms period
   MsTimer2::start();
 
+#ifdef TWO_THERMOMETERS
+
+#else
   // Pins for encoder
   pinMode(PINCLK, INPUT_PULLUP);
   pinMode(PINDT, INPUT_PULLUP);
   // Initial status CLK 
   statLast = digitalRead(PINCLK);
+#endif
 }
 
 // *****************************************************
@@ -229,6 +260,8 @@ void setup() {
 // The loop function runs over and over again forever
 int statCLK;
 void loop() {
+#ifdef TWO_THERMOMETERS
+#else
   noInterrupts();
   // Read pin CLK
   statCLK = digitalRead(PINCLK);
@@ -250,5 +283,6 @@ void loop() {
   interrupts();  
   // Save actual status as "last"
   statLast = statCLK;
+#endif
   delay(1);  // Time for a short break :-) - debounce
 }
